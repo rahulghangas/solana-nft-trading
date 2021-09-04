@@ -29,6 +29,9 @@ This can be done as follows
   * `npm run build:program-rust`
   * `solana program deploy $ROOT_PATH$/dist/program/test.so`
   * `npm run init`
+
+  #### Edit client mint pubkey
+  Go to `$ROOT_PATH/src/client/test.ts` and replace the top level `tokenMintPubKey` with your new token `$TOKEN_MINT`
   
 ## Trading
   #### Listing
