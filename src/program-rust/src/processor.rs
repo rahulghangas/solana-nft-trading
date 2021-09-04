@@ -57,6 +57,10 @@ impl Processor {
                 msg!("Instruction: WithdrawNFTOnSuccess");
                 Self::process_withdraw_nft_on_success(accounts, program_id)
             }
+            NFTInstruction::AcceptListing(instruction::AcceptListing{}) => {
+                msg!("Instruction: AcceptBid");
+                Self::process_accept_listing(accounts, program_id)
+            }
             NFTInstruction::RefundUser(instruction::RefundUser{}) => {
                 msg!("Instruction: RefundUser");
                 Self::process_refund(accounts, program_id)
@@ -88,7 +92,6 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        msg!("Creating state account pubkey");
         let (state_account_pubkey, nonce) = Pubkey::find_program_address(&[b"Platform", b"State"], program_id);
         if !(state_account_info.key.eq(&state_account_pubkey)) {
             return Err(ProgramError::InvalidAccountData);
@@ -99,7 +102,6 @@ impl Processor {
 
         let create_state_account_ix = system_instruction::create_account(initializer_info.key, &state_account_pubkey, required_balance, state::STATESIZE as u64, program_id);
 
-        msg!("submitting tx to create program derived state account");
         invoke_signed(
             &create_state_account_ix,
             &[
@@ -110,14 +112,12 @@ impl Processor {
             ],
             &[&[&b"Platform"[..], &b"State"[..], &[nonce]]],
         )?;
-        msg!("state account pubkey: {}", state_account_pubkey);
 
         PlatformState::pack(
             PlatformState{
                 is_initialized: true,
                 authority: authority,
-                platform_fee: platform_fee,
-                nonce: 0
+                platform_fee: platform_fee
             }, 
             &mut state_account_info.data.borrow_mut()
         )?;
@@ -250,7 +250,6 @@ impl Processor {
             required_balance, 
             state::LISTESCROWSTATE as u64, 
             program_id);
-        msg!("submitting tx to create program derived state account");
         invoke_signed(
             &create_state_account_ix,
             &[
@@ -267,7 +266,6 @@ impl Processor {
                 &[nonce1]
             ]],
         )?;
-        msg!("state account pubkey: {}", escrow_state_account_pubkey);
 
 
         let (escrow_vault_account_pubkey, nonce2) = Pubkey::find_program_address(&[
@@ -299,7 +297,6 @@ impl Processor {
                 &[nonce2]
             ]],
         )?;
-        msg!("vault account pubkey: {}", escrow_vault_account_pubkey);
 
         let initialize_vault_account_ix = spl_token::instruction::initialize_account(
             &spl_token::id(), 
@@ -325,7 +322,6 @@ impl Processor {
                 &[nonce2]
             ]],
         )?;
-        msg!("initialized vault account");
 
         let transfer_token_ix = spl_token::instruction::transfer_checked(
             &spl_token::id(),
@@ -525,8 +521,13 @@ impl Processor {
         }
         let rent = &Rent::from_account_info(rent_account_info)?;
         let required_balance = rent.minimum_balance(state::BIDESCROWSTATE);
-        let create_state_account_ix = system_instruction::create_account(initializer_info.key, &escrow_state_account_pubkey, required_balance, state::BIDESCROWSTATE as u64, program_id);
-        msg!("submitting tx to create program derived state account");
+        let create_state_account_ix = system_instruction::create_account(
+            initializer_info.key, 
+            &escrow_state_account_pubkey, 
+            required_balance, 
+            state::BIDESCROWSTATE as u64, 
+            program_id
+        );
         invoke_signed(
             &create_state_account_ix,
             &[
@@ -543,7 +544,6 @@ impl Processor {
                 &[nonce1]
             ]],
         )?;
-        msg!("state account pubkey: {}", escrow_state_account_pubkey);
 
         let (escrow_vault_account_pubkey, nonce2) = Pubkey::find_program_address(&[
             mint_account_info.key.as_ref(),
@@ -557,8 +557,13 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
         let required_balance = rent.minimum_balance(0);
-        let create_vault_account_ix = system_instruction::create_account(initializer_info.key, &escrow_vault_account_pubkey, required_balance, 0, program_id);
-        msg!("submitting tx to create program derived vault account");
+        let create_vault_account_ix = system_instruction::create_account(
+            initializer_info.key, 
+            &escrow_vault_account_pubkey, 
+            required_balance, 
+            0, 
+            program_id
+        );
         invoke_signed(
             &create_vault_account_ix,
             &[
@@ -575,9 +580,7 @@ impl Processor {
                 &[nonce2]
             ]],
         )?;
-        msg!("vault account pubkey: {}", escrow_vault_account_pubkey);
 
-        msg!("amount is {}", amount);
         let transfer_lamports_ix = system_instruction::transfer(initializer_info.key, &escrow_vault_account_pubkey, amount);
         invoke(
             &transfer_lamports_ix,
@@ -765,7 +768,6 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        msg!("checking mint");
         let mint_account_info = next_account_info(account_info_iter)?;
         if !(mint_account_info.owner.eq(&spl_token::id())) {
             return Err(ProgramError::InvalidAccountData);
@@ -775,10 +777,8 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        msg!("checking lister");
-        let lister_account_info = next_account_info(account_info_iter)?;
 
-        msg!("checking lister state");
+        let lister_account_info = next_account_info(account_info_iter)?;
         let escrow_list_state_account_info = next_account_info(account_info_iter)?;
         let escrow_list_vault_account_info = next_account_info(account_info_iter)?;
         let (escrow_list_state_account_pubkey, nonce1) = Pubkey::find_program_address(&[
@@ -792,7 +792,6 @@ impl Processor {
         if !(escrow_list_state_account_info.key.eq(&escrow_list_state_account_pubkey)) {
             return Err(ProgramError::InvalidAccountData);
         }
-        msg!("checking lister vault");
         let (escrow_list_vault_account_pubkey, _) = Pubkey::find_program_address(&[
             mint_account_info.key.as_ref(),
             lister_account_info.key.as_ref(),
@@ -805,28 +804,21 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        msg!("checking token program");
         let token_program_info = next_account_info(account_info_iter)?;
         if !(spl_token::id().eq(token_program_info.key)) {
             return Err(ProgramError::InvalidAccountData);
         }
 
         let list_state = ListEscrowState::unpack_unchecked(&escrow_list_state_account_info.data.borrow())?;
-        msg!("checking lister state:lister");
         if !list_state.lister.eq(lister_account_info.key) {
             return Err(ProgramError::InvalidAccountData);
         }
-        msg!("checking lister state:success");
         if !list_state.success {
             return Err(ProgramError::InvalidAccountData);
         }
-        msg!("checking lister state:successful_buyer");
         if !list_state.successful_buyer.eq(signer_info.key) {
-            msg!("Expected {}, got {}", list_state.successful_buyer, signer_info.key);
             return Err(ProgramError::InvalidAccountData);
         }
-
-        msg!("all checks completed succesfully");
 
         let nft_transfer_ix = spl_token::instruction::transfer_checked(
             &spl_token::id(),
@@ -881,6 +873,153 @@ impl Processor {
                 &b"State"[..],
                 &[nonce1]
             ]],
+        )?;
+
+        let lamports = escrow_list_state_account_info.lamports();
+        **escrow_list_state_account_info.try_borrow_mut_lamports()? = 0;
+        **lister_account_info.try_borrow_mut_lamports()? += lamports;
+
+        Ok(())
+    }
+
+    fn process_accept_listing(
+        accounts: &[AccountInfo],
+        program_id: &Pubkey,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let signer_info = next_account_info(account_info_iter)?;
+        if !signer_info.is_signer {
+            return Err(ProgramError::MissingRequiredSignature);
+        }
+
+        let token_account_info = next_account_info(account_info_iter)?;
+        let token_account_data = spl_token::state::Account::unpack_unchecked(&token_account_info.data.borrow())?;
+        if !(token_account_data.owner.eq(&signer_info.key)) {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        let mint_account_info = next_account_info(account_info_iter)?;
+        if !(mint_account_info.owner.eq(&spl_token::id())) {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        if !(token_account_data.mint.eq(&mint_account_info.key)) {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        let lister_account_info = next_account_info(account_info_iter)?;
+
+        let escrow_list_state_account_info = next_account_info(account_info_iter)?;
+        let escrow_list_vault_account_info = next_account_info(account_info_iter)?;
+        let (escrow_list_state_account_pubkey, nonce1) = Pubkey::find_program_address(&[
+            mint_account_info.key.as_ref(),
+            lister_account_info.key.as_ref(),
+            b"List",
+            b"State"
+            ],
+            program_id
+        );
+        if !(escrow_list_state_account_info.key.eq(&escrow_list_state_account_pubkey)) {
+            return Err(ProgramError::InvalidAccountData);
+        }
+        let (escrow_list_vault_account_pubkey, _) = Pubkey::find_program_address(&[
+            mint_account_info.key.as_ref(),
+            lister_account_info.key.as_ref(),
+            b"List",
+            b"Vault"
+            ],
+            program_id
+        );
+        if !(escrow_list_vault_account_info.key.eq(&escrow_list_vault_account_pubkey)) {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        let token_program_info = next_account_info(account_info_iter)?;
+        if !(spl_token::id().eq(token_program_info.key)) {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        let system_program_info = next_account_info(account_info_iter)?;
+        if !(system_program_info.key.eq(&system_program::id())) {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        let nft_transfer_ix = spl_token::instruction::transfer_checked(
+            &spl_token::id(),
+            &escrow_list_vault_account_pubkey,
+            mint_account_info.key,
+            token_account_info.key,
+            &escrow_list_state_account_pubkey,
+            &[&escrow_list_state_account_pubkey],
+            1,
+            0
+        )?;
+        
+        invoke_signed(
+            &nft_transfer_ix,
+            &[
+                token_program_info.clone(),
+                escrow_list_vault_account_info.clone(),
+                mint_account_info.clone(),
+                token_account_info.clone(),
+                escrow_list_state_account_info.clone(),
+            ],
+
+            &[&[
+                mint_account_info.key.as_ref(),
+                lister_account_info.key.as_ref(),
+                &b"List"[..],
+                &b"State"[..],
+                &[nonce1]
+            ]]
+        )?;
+
+        let close_ix = spl_token::instruction::close_account(
+            &spl_token::id(), 
+            &escrow_list_vault_account_pubkey, 
+            &escrow_list_state_account_pubkey, 
+            &escrow_list_state_account_pubkey, 
+            &[&escrow_list_state_account_pubkey]
+        )?;
+
+        invoke_signed(
+            &close_ix,
+            &[
+                token_program_info.clone(),
+                escrow_list_vault_account_info.clone(),
+                signer_info.clone(),
+                escrow_list_state_account_info.clone(),
+            ],
+            &[&[
+                mint_account_info.key.as_ref(),
+                lister_account_info.key.as_ref(),
+                &b"List"[..],
+                &b"State"[..],
+                &[nonce1]
+            ]],
+        )?;
+
+        let mut list_state = ListEscrowState::unpack_unchecked(&escrow_list_state_account_info.data.borrow())?;
+        if !list_state.lister.eq(lister_account_info.key) {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        let transfer_lamports_ix = system_instruction::transfer(signer_info.key, lister_account_info.key, list_state.amount);
+        invoke(
+            &transfer_lamports_ix,
+            &[
+                signer_info.clone(),
+                lister_account_info.clone(),
+                system_program_info.clone()
+            ]
+        )?;
+
+        list_state.success = true;
+        list_state.successful_buyer = *signer_info.key;
+
+        ListEscrowState::pack(
+            list_state,
+            &mut escrow_list_state_account_info.data.borrow_mut()
         )?;
 
         let lamports = escrow_list_state_account_info.lamports();

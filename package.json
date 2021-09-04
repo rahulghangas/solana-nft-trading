@@ -18,6 +18,7 @@
     "withdraw-bid": "ts-node src/client/withdraw-bid.ts",
     "accept-bid": "ts-node src/client/accept-bid.ts",
     "withdraw-on-success": "ts-node src/client/withdraw-on-success.ts",
+    "accept-listing": "ts-node src/client/accept-listing.ts",
     "refund": "ts-node src/client/refund.ts",
     "start-with-test-validator": "start-server-and-test 'solana-test-validator --reset --quiet' http://localhost:8899/health start",
     "lint": "eslint --ext .ts src/client/* && prettier --check \"src/client/**/*.ts\"",

@@ -23,6 +23,10 @@ pub enum NFTError {
     /// Failed to unpack U64
     #[error("Failed to unpack U64")]
     FailedToUnpackU64,
+
+    /// Listing already fulfilled
+    #[error("Listing already fulfilled")]
+    ListingAlreadyFullfilled,
 }
 
 impl From<NFTError> for ProgramError {

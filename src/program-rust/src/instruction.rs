@@ -1,8 +1,7 @@
 use std::convert::{TryInto};
 use solana_program::{
     program_error::ProgramError,
-    pubkey::Pubkey,
-    msg
+    pubkey::Pubkey
 };
 use arrayref::{array_ref};
 use crate::error::NFTError;
@@ -60,6 +59,11 @@ pub struct WithdrawNFTOnSuccess {
 
 #[repr(C)]
 #[derive(Debug, PartialEq)]
+pub struct AcceptListing {
+}
+
+#[repr(C)]
+#[derive(Debug, PartialEq)]
 pub struct RefundUser {
 }
 
@@ -75,6 +79,7 @@ pub enum NFTInstruction {
     WithdrawBid(WithdrawBid),
     AcceptBid(AcceptBid),
     WithdrawNFTOnSuccess(WithdrawNFTOnSuccess),
+    AcceptListing(AcceptListing),
     RefundUser(RefundUser)
 }
 
@@ -144,6 +149,9 @@ impl NFTInstruction {
                 Ok(Self::WithdrawNFTOnSuccess(WithdrawNFTOnSuccess{}))
             }
             9 => {
+                Ok(Self::AcceptListing(AcceptListing{}))
+            }
+            10 => {
                 Ok(Self::RefundUser(RefundUser{}))
             }
             _ => Err(NFTError::InvalidInstruction.into()),
