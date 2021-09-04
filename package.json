@@ -10,7 +10,7 @@
   "author": "",
   "license": "MIT",
   "scripts": {
-    "deploy": "ts-node src/client/deploy.ts",
+    "init": "ts-node src/client/init.ts",
     "change-authority": "ts-node src/client/change-authority.ts",
     "list": "ts-node src/client/list.ts",
     "delist": "ts-node src/client/delist.ts",

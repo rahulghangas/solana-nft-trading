@@ -76,32 +76,44 @@ impl Processor {
     ) -> ProgramResult {  
         let account_info_iter = &mut accounts.iter();
         let initializer_info = next_account_info(account_info_iter)?;
+        let state_account_info = next_account_info(account_info_iter)?;
+        let vault_account_info = next_account_info(account_info_iter)?;
+        let program_info = next_account_info(account_info_iter)?;
+        let system_program_info = next_account_info(account_info_iter)?;
+        let rent_account_info = next_account_info(account_info_iter)?;
+
         if !initializer_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
-
-        let state_account_info = next_account_info(account_info_iter)?;
-
-        let program_info = next_account_info(account_info_iter)?;
+        
         if !(program_info.key.eq(program_id)) {
             return Err(ProgramError::InvalidAccountData);
         }
         
-        let system_program_info = next_account_info(account_info_iter)?;
         if !(system_program_info.key.eq(&system_program::id())) {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let (state_account_pubkey, nonce) = Pubkey::find_program_address(&[b"Platform", b"State"], program_id);
+        let (state_account_pubkey, nonce1) = Pubkey::find_program_address(&[b"Platform", b"State"], program_id);
         if !(state_account_info.key.eq(&state_account_pubkey)) {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
+        let (vault_account_pubkey, nonce2) = Pubkey::find_program_address(&[b"Platform", b"Vault"], program_id);
+        if !(vault_account_info.key.eq(&vault_account_pubkey)) {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        let rent = &Rent::from_account_info(rent_account_info)?;
         let required_balance = rent.minimum_balance(state::STATESIZE);
 
-        let create_state_account_ix = system_instruction::create_account(initializer_info.key, &state_account_pubkey, required_balance, state::STATESIZE as u64, program_id);
-
+        let create_state_account_ix = system_instruction::create_account(
+            initializer_info.key, 
+            &state_account_pubkey, 
+            required_balance, 
+            state::STATESIZE as u64, 
+            program_id
+        );
         invoke_signed(
             &create_state_account_ix,
             &[
@@ -110,7 +122,26 @@ impl Processor {
                 system_program_info.clone(),
                 program_info.clone(),
             ],
-            &[&[&b"Platform"[..], &b"State"[..], &[nonce]]],
+            &[&[&b"Platform"[..], &b"State"[..], &[nonce1]]],
+        )?;
+
+        let required_balance = rent.minimum_balance(0);
+        let create_vault_account_ix = system_instruction::create_account(
+            initializer_info.key, 
+            &vault_account_pubkey, 
+            required_balance, 
+            0, 
+            program_id
+        );
+        invoke_signed(
+            &create_vault_account_ix,
+            &[
+                initializer_info.clone(),
+                vault_account_info.clone(),
+                system_program_info.clone(),
+                program_info.clone(),
+            ],
+            &[&[&b"Platform"[..], &b"Vault"[..], &[nonce2]]],
         )?;
 
         PlatformState::pack(
@@ -132,11 +163,12 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let initializer_info = next_account_info(account_info_iter)?;
+        let state_account_info = next_account_info(account_info_iter)?;
+
         if !initializer_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
-
-        let state_account_info = next_account_info(account_info_iter)?;
+        
         let (state_account_pubkey, _) = Pubkey::find_program_address(&[b"Platform", b"State"], program_id);
         let mut state_info = PlatformState::unpack_unchecked(&state_account_info.data.borrow())?;
         if !(state_account_info.key.eq(&state_account_pubkey)) {
@@ -162,11 +194,12 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let initializer_info = next_account_info(account_info_iter)?;
+        let state_account_info = next_account_info(account_info_iter)?;
+
         if !initializer_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
 
-        let state_account_info = next_account_info(account_info_iter)?;
         let (state_account_pubkey, _) = Pubkey::find_program_address(&[b"Platform", b"State"], program_id);
         let mut state_info = PlatformState::unpack_unchecked(&state_account_info.data.borrow())?;
         if !(state_account_info.key.eq(&state_account_pubkey)) {
@@ -192,17 +225,24 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let initializer_info = next_account_info(account_info_iter)?;
+        let token_account_info = next_account_info(account_info_iter)?;
+        let mint_account_info = next_account_info(account_info_iter)?;
+        let escrow_state_account_info = next_account_info(account_info_iter)?;
+        let escrow_vault_account_info = next_account_info(account_info_iter)?;
+        let program_info = next_account_info(account_info_iter)?;
+        let token_program_info = next_account_info(account_info_iter)?;
+        let system_program_info = next_account_info(account_info_iter)?;
+        let rent_account_info = next_account_info(account_info_iter)?;
+
         if !initializer_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
 
-        let token_account_info = next_account_info(account_info_iter)?;
         let token_account_data = spl_token::state::Account::unpack_unchecked(&token_account_info.data.borrow())?;
         if !(token_account_data.owner.eq(&initializer_info.key)) {
             return Err(ProgramError::InvalidAccountData);
         }
-
-        let mint_account_info = next_account_info(account_info_iter)?;
+        
         if !(mint_account_info.owner.eq(&spl_token::id())) {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -210,26 +250,18 @@ impl Processor {
         if !(token_account_data.mint.eq(&mint_account_info.key)) {
             return Err(ProgramError::InvalidAccountData);
         }
-
-        let escrow_state_account_info = next_account_info(account_info_iter)?;
-        let escrow_vault_account_info = next_account_info(account_info_iter)?;
-
-        let program_info = next_account_info(account_info_iter)?;
+        
         if !(program_info.key.eq(program_id)) {
             return Err(ProgramError::InvalidAccountData);
         }
-
-        let token_program_info = next_account_info(account_info_iter)?;
+       
         if !(spl_token::id().eq(token_program_info.key)) {
             return Err(ProgramError::InvalidAccountData);
         }
-        
-        let system_program_info = next_account_info(account_info_iter)?;
+            
         if !(system_program_info.key.eq(&system_program::id())) {
             return Err(ProgramError::InvalidAccountData);
         }
-
-        let rent_account_info = next_account_info(account_info_iter)?;
 
         let (escrow_state_account_pubkey, nonce1) = Pubkey::find_program_address(&[
             mint_account_info.key.as_ref(),
@@ -358,6 +390,8 @@ impl Processor {
             &mut escrow_state_account_info.data.borrow_mut()
         )?;
 
+        msg!("{{action: \"List\", lister \"{}\",, amount: {}, mint: {}}}", initializer_info.key, amount, mint_account_info.key);
+
         Ok(())
     }
 
@@ -367,30 +401,30 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let signer_info = next_account_info(account_info_iter)?;
+        let token_account_info = next_account_info(account_info_iter)?;
+        let mint_account_info = next_account_info(account_info_iter)?;
+        let escrow_state_account_info = next_account_info(account_info_iter)?;
+        let escrow_vault_account_info = next_account_info(account_info_iter)?;
+        let program_info = next_account_info(account_info_iter)?;
+        let token_program_info = next_account_info(account_info_iter)?;
+
         if !signer_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
 
-        let token_account_info = next_account_info(account_info_iter)?;
         let token_account_data = spl_token::state::Account::unpack_unchecked(&token_account_info.data.borrow())?;
         if !(token_account_data.owner.eq(&signer_info.key)) {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let mint_account_info = next_account_info(account_info_iter)?;
         if !(mint_account_info.owner.eq(&spl_token::id())) {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let escrow_state_account_info = next_account_info(account_info_iter)?;
-        let escrow_vault_account_info = next_account_info(account_info_iter)?;
-
-        let program_info = next_account_info(account_info_iter)?;
         if !(program_info.key.eq(program_id)) {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let token_program_info = next_account_info(account_info_iter)?;
         if !(spl_token::id().eq(token_program_info.key)) {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -473,6 +507,12 @@ impl Processor {
         **escrow_state_account_info.try_borrow_mut_lamports()? = 0;
         **signer_info.try_borrow_mut_lamports()? += lamports;
 
+        let list_state = ListEscrowState::unpack_unchecked(&escrow_state_account_info.data.borrow())?;
+        if list_state.success {
+            return Err(NFTError::ListingAlreadyFullfilled.into());
+        }
+        msg!("{{action: \"DeList\", lister \"{}\", amount: {}, mint: {}}}", signer_info.key, list_state.amount, mint_account_info.key);
+
         Ok(())
     }
 
@@ -483,30 +523,29 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let initializer_info = next_account_info(account_info_iter)?;
+        let mint_account_info = next_account_info(account_info_iter)?;
+        let escrow_state_account_info = next_account_info(account_info_iter)?;
+        let escrow_vault_account_info = next_account_info(account_info_iter)?;
+        let program_info = next_account_info(account_info_iter)?;
+        let system_program_info = next_account_info(account_info_iter)?;
+        let rent_account_info = next_account_info(account_info_iter)?;
+
         if !initializer_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
-
-        let mint_account_info = next_account_info(account_info_iter)?;
+  
         if !(mint_account_info.owner.eq(&spl_token::id())) {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let escrow_state_account_info = next_account_info(account_info_iter)?;
-        let escrow_vault_account_info = next_account_info(account_info_iter)?;
-
-        let program_info = next_account_info(account_info_iter)?;
         if !(program_info.key.eq(program_id)) {
             return Err(ProgramError::InvalidAccountData);
         }
         
-        let system_program_info = next_account_info(account_info_iter)?;
+        
         if !(system_program_info.key.eq(&system_program::id())) {
             return Err(ProgramError::InvalidAccountData);
-        }
-
-        let rent_account_info = next_account_info(account_info_iter)?;
-        
+        }        
 
         let (escrow_state_account_pubkey, nonce1) = Pubkey::find_program_address(&[
             mint_account_info.key.as_ref(),
@@ -599,6 +638,8 @@ impl Processor {
             &mut escrow_state_account_info.data.borrow_mut()
         )?;
 
+        msg!("{{action: \"Bid\", bidder: \"{}\", amount: {}, mint: \"{}\"}}", initializer_info.key, amount, mint_account_info.key);
+
         Ok(())
     }
 
@@ -608,19 +649,19 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let signer_info = next_account_info(account_info_iter)?;
+        let mint_account_info = next_account_info(account_info_iter)?;
+        let escrow_state_account_info = next_account_info(account_info_iter)?;
+        let escrow_vault_account_info = next_account_info(account_info_iter)?;
+        let program_info = next_account_info(account_info_iter)?;
+        
         if !signer_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
 
-        let mint_account_info = next_account_info(account_info_iter)?;
         if !(mint_account_info.owner.eq(&spl_token::id())) {
             return Err(ProgramError::InvalidAccountData);
-        }
+        }        
 
-        let escrow_state_account_info = next_account_info(account_info_iter)?;
-        let escrow_vault_account_info = next_account_info(account_info_iter)?;
-
-        let program_info = next_account_info(account_info_iter)?;
         if !(program_info.key.eq(program_id)) {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -654,6 +695,9 @@ impl Processor {
         **escrow_vault_account_info.try_borrow_mut_lamports()? = 0;
         **signer_info.try_borrow_mut_lamports()? += lamports;
 
+        let bid_state = ListEscrowState::unpack_unchecked(&escrow_state_account_info.data.borrow())?;
+        msg!("{{action: \"WithdrawBid\", bidder: \"{}\", amount: {}, mint: {}}}", signer_info.key, bid_state.amount, mint_account_info.key);
+
         Ok(())
     }
 
@@ -663,19 +707,32 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let signer_info = next_account_info(account_info_iter)?;
+        let mint_account_info = next_account_info(account_info_iter)?;
+        let bidder_account_info = next_account_info(account_info_iter)?;
+        let state_account_info = next_account_info(account_info_iter)?;
+        let vault_account_info = next_account_info(account_info_iter)?;
+        let escrow_bid_state_account_info = next_account_info(account_info_iter)?;
+        let escrow_bid_vault_account_info = next_account_info(account_info_iter)?;
+        let escrow_list_state_account_info = next_account_info(account_info_iter)?;
+        let escrow_list_vault_account_info = next_account_info(account_info_iter)?;
+
         if !signer_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
 
-        let mint_account_info = next_account_info(account_info_iter)?;
         if !(mint_account_info.owner.eq(&spl_token::id())) {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let bidder_account_info = next_account_info(account_info_iter)?;
+        let (state_account_pubkey, _) = Pubkey::find_program_address(&[b"Platform", b"State"], program_id);
+        if !(state_account_info.key.eq(&state_account_pubkey)) {
+            return Err(ProgramError::InvalidAccountData);
+        }
+        let (vault_account_pubkey, _) = Pubkey::find_program_address(&[b"Platform", b"Vault"], program_id);
+        if !(vault_account_info.key.eq(&vault_account_pubkey)) {
+            return Err(ProgramError::InvalidAccountData);
+        }
 
-        let escrow_bid_state_account_info = next_account_info(account_info_iter)?;
-        let escrow_bid_vault_account_info = next_account_info(account_info_iter)?;
         let (escrow_bid_state_account_pubkey, _) = Pubkey::find_program_address(&[
             mint_account_info.key.as_ref(),
             bidder_account_info.key.as_ref(),
@@ -698,9 +755,7 @@ impl Processor {
         if !(escrow_bid_vault_account_info.key.eq(&escrow_bid_vault_account_pubkey)) {
             return Err(ProgramError::InvalidAccountData);
         }
-
-        let escrow_list_state_account_info = next_account_info(account_info_iter)?;
-        let escrow_list_vault_account_info = next_account_info(account_info_iter)?;
+        
         let (escrow_list_state_account_pubkey, _) = Pubkey::find_program_address(&[
             mint_account_info.key.as_ref(),
             signer_info.key.as_ref(),
@@ -724,9 +779,14 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
 
+        let platform_state = PlatformState::unpack_unchecked(&state_account_info.data.borrow())?;
+
         let mut list_state = ListEscrowState::unpack_unchecked(&escrow_list_state_account_info.data.borrow())?;
         if !list_state.lister.eq(signer_info.key) {
             return Err(ProgramError::InvalidAccountData);
+        }
+        if list_state.success {
+            return Err(NFTError::ListingAlreadyFullfilled.into());
         }
 
         let bid_state = BidEscrowState::unpack_unchecked(&escrow_bid_state_account_info.data.borrow())?;
@@ -743,11 +803,16 @@ impl Processor {
             &mut escrow_list_state_account_info.data.borrow_mut()
         )?;
 
-        let total_lamports = escrow_bid_vault_account_info.lamports() + escrow_bid_state_account_info.lamports();
+        let fees_to_platform = (bid_state.amount * platform_state.platform_fee ) / 10000000;
+        let amount_after_fees = bid_state.amount - fees_to_platform;
+        let lamports_to_bidder = escrow_bid_state_account_info.lamports() + escrow_bid_vault_account_info.lamports() - bid_state.amount;
         **escrow_bid_state_account_info.try_borrow_mut_lamports()? = 0;
         **escrow_bid_vault_account_info.try_borrow_mut_lamports()? = 0;
-        **signer_info.try_borrow_mut_lamports()? += bid_state.amount;
-        **bidder_account_info.try_borrow_mut_lamports()? += total_lamports - bid_state.amount;
+        **vault_account_info.try_borrow_mut_lamports()? += fees_to_platform;
+        **signer_info.try_borrow_mut_lamports()? += amount_after_fees;
+        **bidder_account_info.try_borrow_mut_lamports()? += lamports_to_bidder;
+
+        msg!("{{action: \"AcceptBid\", bidder: \"{}\", amount: {}, mint: \"{}\"}}", bidder_account_info.key, bid_state.amount, list_state.mint);
 
         Ok(())
     }
@@ -758,17 +823,22 @@ impl Processor {
     ) -> ProgramResult{
         let account_info_iter = &mut accounts.iter();
         let signer_info = next_account_info(account_info_iter)?;
+        let token_account_info = next_account_info(account_info_iter)?;
+        let mint_account_info = next_account_info(account_info_iter)?;
+        let lister_account_info = next_account_info(account_info_iter)?;
+        let escrow_list_state_account_info = next_account_info(account_info_iter)?;
+        let escrow_list_vault_account_info = next_account_info(account_info_iter)?;
+        let token_program_info = next_account_info(account_info_iter)?;
+
         if !signer_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
 
-        let token_account_info = next_account_info(account_info_iter)?;
         let token_account_data = spl_token::state::Account::unpack_unchecked(&token_account_info.data.borrow())?;
         if !(token_account_data.owner.eq(&signer_info.key)) {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let mint_account_info = next_account_info(account_info_iter)?;
         if !(mint_account_info.owner.eq(&spl_token::id())) {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -777,10 +847,6 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
 
-
-        let lister_account_info = next_account_info(account_info_iter)?;
-        let escrow_list_state_account_info = next_account_info(account_info_iter)?;
-        let escrow_list_vault_account_info = next_account_info(account_info_iter)?;
         let (escrow_list_state_account_pubkey, nonce1) = Pubkey::find_program_address(&[
             mint_account_info.key.as_ref(),
             lister_account_info.key.as_ref(),
@@ -804,7 +870,6 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let token_program_info = next_account_info(account_info_iter)?;
         if !(spl_token::id().eq(token_program_info.key)) {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -888,17 +953,25 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let signer_info = next_account_info(account_info_iter)?;
+        let token_account_info = next_account_info(account_info_iter)?;
+        let mint_account_info = next_account_info(account_info_iter)?;
+        let lister_account_info = next_account_info(account_info_iter)?;
+        let state_account_info = next_account_info(account_info_iter)?;
+        let vault_account_info = next_account_info(account_info_iter)?;
+        let escrow_list_state_account_info = next_account_info(account_info_iter)?;
+        let escrow_list_vault_account_info = next_account_info(account_info_iter)?;
+        let token_program_info = next_account_info(account_info_iter)?;
+        let system_program_info = next_account_info(account_info_iter)?;
+
         if !signer_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
 
-        let token_account_info = next_account_info(account_info_iter)?;
         let token_account_data = spl_token::state::Account::unpack_unchecked(&token_account_info.data.borrow())?;
         if !(token_account_data.owner.eq(&signer_info.key)) {
             return Err(ProgramError::InvalidAccountData);
         }
-
-        let mint_account_info = next_account_info(account_info_iter)?;
+        
         if !(mint_account_info.owner.eq(&spl_token::id())) {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -907,10 +980,16 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let lister_account_info = next_account_info(account_info_iter)?;
+        let (state_account_pubkey, _) = Pubkey::find_program_address(&[b"Platform", b"State"], program_id);
+        if !(state_account_info.key.eq(&state_account_pubkey)) {
+            return Err(ProgramError::InvalidAccountData);
+        }
 
-        let escrow_list_state_account_info = next_account_info(account_info_iter)?;
-        let escrow_list_vault_account_info = next_account_info(account_info_iter)?;
+        let (vault_account_pubkey, _) = Pubkey::find_program_address(&[b"Platform", b"Vault"], program_id);
+        if !(vault_account_info.key.eq(&vault_account_pubkey)) {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
         let (escrow_list_state_account_pubkey, nonce1) = Pubkey::find_program_address(&[
             mint_account_info.key.as_ref(),
             lister_account_info.key.as_ref(),
@@ -934,12 +1013,10 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let token_program_info = next_account_info(account_info_iter)?;
         if !(spl_token::id().eq(token_program_info.key)) {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let system_program_info = next_account_info(account_info_iter)?;
         if !(system_program_info.key.eq(&system_program::id())) {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -999,20 +1076,38 @@ impl Processor {
             ]],
         )?;
 
+        let platform_state = PlatformState::unpack_unchecked(&state_account_info.data.borrow())?;
+
         let mut list_state = ListEscrowState::unpack_unchecked(&escrow_list_state_account_info.data.borrow())?;
         if !list_state.lister.eq(lister_account_info.key) {
             return Err(ProgramError::InvalidAccountData);
         }
+        if list_state.success {
+            return Err(NFTError::ListingAlreadyFullfilled.into());
+        }
 
-        let transfer_lamports_ix = system_instruction::transfer(signer_info.key, lister_account_info.key, list_state.amount);
+        let fees_to_platform = (list_state.amount * platform_state.platform_fee ) / 10000000;
+        let amount_after_fees = list_state.amount - fees_to_platform;
+
+        let transfer_lamports_lister_ix = system_instruction::transfer(signer_info.key, lister_account_info.key, amount_after_fees);
         invoke(
-            &transfer_lamports_ix,
+            &transfer_lamports_lister_ix,
             &[
                 signer_info.clone(),
                 lister_account_info.clone(),
                 system_program_info.clone()
             ]
         )?;
+        let transfer_lamports_platform_ix = system_instruction::transfer(signer_info.key, &vault_account_pubkey, fees_to_platform);
+        invoke(
+            &transfer_lamports_platform_ix,
+            &[
+                signer_info.clone(),
+                vault_account_info.clone(),
+                system_program_info.clone()
+            ]
+        )?;
+        
 
         list_state.success = true;
         list_state.successful_buyer = *signer_info.key;
@@ -1026,6 +1121,8 @@ impl Processor {
         **escrow_list_state_account_info.try_borrow_mut_lamports()? = 0;
         **lister_account_info.try_borrow_mut_lamports()? += lamports;
 
+        msg!("{{action: \"AcceptListing\", lister: \"{}\", amount: {}, mint: \"{}\"}}", lister_account_info.key, list_state.amount, mint_account_info.key);
+
         Ok(())
     }
 
@@ -1035,18 +1132,20 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let signer_info = next_account_info(account_info_iter)?;
+        let mint_account_info = next_account_info(account_info_iter)?;
+        let bidder_account_info = next_account_info(account_info_iter)?;
+        let state_account_info = next_account_info(account_info_iter)?;
+        let escrow_bid_state_account_info = next_account_info(account_info_iter)?;
+        let escrow_bid_vault_account_info = next_account_info(account_info_iter)?;
+
         if !signer_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
 
-        let mint_account_info = next_account_info(account_info_iter)?;
         if !(mint_account_info.owner.eq(&spl_token::id())) {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let bidder_account_info = next_account_info(account_info_iter)?;
-
-        let state_account_info = next_account_info(account_info_iter)?;
         let (state_account_pubkey, _) = Pubkey::find_program_address(&[b"Platform", b"State"], program_id);
         if !(state_account_info.key.eq(&state_account_pubkey)) {
             return Err(ProgramError::InvalidAccountData);
@@ -1059,8 +1158,6 @@ impl Processor {
             return Err(NFTError::InvalidAuthority.into()); 
         }
 
-        let escrow_bid_state_account_info = next_account_info(account_info_iter)?;
-        let escrow_bid_vault_account_info = next_account_info(account_info_iter)?;
         let (escrow_bid_state_account_pubkey, _) = Pubkey::find_program_address(&[
             mint_account_info.key.as_ref(),
             bidder_account_info.key.as_ref(),
