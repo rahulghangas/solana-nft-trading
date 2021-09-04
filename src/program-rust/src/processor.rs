@@ -695,7 +695,7 @@ impl Processor {
         **escrow_vault_account_info.try_borrow_mut_lamports()? = 0;
         **signer_info.try_borrow_mut_lamports()? += lamports;
 
-        let bid_state = ListEscrowState::unpack_unchecked(&escrow_state_account_info.data.borrow())?;
+        let bid_state = BidEscrowState::unpack_unchecked(&escrow_state_account_info.data.borrow())?;
         msg!("{{action: \"WithdrawBid\", bidder: \"{}\", amount: {}, mint: {}}}", signer_info.key, bid_state.amount, mint_account_info.key);
 
         Ok(())
