@@ -812,7 +812,8 @@ impl Processor {
         **signer_info.try_borrow_mut_lamports()? += amount_after_fees;
         **bidder_account_info.try_borrow_mut_lamports()? += lamports_to_bidder;
 
-        msg!("{{action: \"AcceptBid\", bidder: \"{}\", amount: {}, mint: \"{}\"}}", bidder_account_info.key, bid_state.amount, list_state.mint);
+        let log = format!("{{action: \"AcceptBid\", bidder: \"{}\", lister: \"{}\", amount: {}, mint: \"{}\"}}", bidder_account_info.key.to_string(), signer_info.key.to_string(), bid_state.amount, list_state.mint.to_string());
+        msg!(&log);
 
         Ok(())
     }
@@ -1121,7 +1122,8 @@ impl Processor {
         **escrow_list_state_account_info.try_borrow_mut_lamports()? = 0;
         **lister_account_info.try_borrow_mut_lamports()? += lamports;
 
-        msg!("{{action: \"AcceptListing\", lister: \"{}\", amount: {}, mint: \"{}\"}}", lister_account_info.key, list_state.amount, mint_account_info.key);
+        let log = format!("{{action: \"AcceptListing\", bidder: \"{}\", lister: \"{}\", amount: {}, mint: \"{}\"}}", signer_info.key.to_string(), lister_account_info.key.to_string(), list_state.amount, mint_account_info.key.to_string());
+        msg!(&log);
 
         Ok(())
     }
