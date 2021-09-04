@@ -1,4 +1,3 @@
-
 [package]
 name = "solana-bpf-test"
 version = "0.0.1"

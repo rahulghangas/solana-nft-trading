@@ -1,7 +1,8 @@
 use std::convert::{TryInto};
 use solana_program::{
     program_error::ProgramError,
-    pubkey::Pubkey
+    pubkey::Pubkey,
+    msg
 };
 use arrayref::{array_ref};
 use crate::error::NFTError;
@@ -85,7 +86,7 @@ impl NFTInstruction {
                 if rest.len() < 32usize {
                     return Err(NFTError::InvalidAuthority.into());
                 }
-                let (authority_bytes_slice, rest) = input.split_at(32);
+                let (authority_bytes_slice, rest) = rest.split_at(32);
                 if rest.len() == 8usize {
                     let platform_fee = Self::unpack_amount(rest)?;
 

@@ -23,6 +23,7 @@ import {
   longToByteArray,
   newAccountWithLamports,
   readAccountFromFile,
+  findAssociatedTokenAddress
 } from './utils';
 
 /**
@@ -149,21 +150,17 @@ export async function initializeProgram(): Promise<void> {
   const byteArray = [0];
   const instrunctionBuffer = Buffer.from(byteArray);
   const authorityBuffer = Buffer.from(payerAccount.publicKey.toBytes());
-  const list = [instrunctionBuffer, authorityBuffer];
+  const feeBytes = longToByteArray(10000000);
+  const feeBuffer = Buffer.from(feeBytes)
+  const list = [instrunctionBuffer, authorityBuffer, feeBuffer];
   const buffer = Buffer.concat(list);
 
-  const accountPubKey = await PublicKey.findProgramAddress([Buffer.from("Locker"), Buffer.from("Init")], programId);
-  const vaultPubKey = await PublicKey.findProgramAddress([Buffer.from("Locker"), Buffer.from("Vault")], programId);
-  const mintlogPubKey = await PublicKey.findProgramAddress([Buffer.from("Locker"), Buffer.from("Mint")], programId);
-  const burnlogPubKey = await PublicKey.findProgramAddress([Buffer.from("Locker"), Buffer.from("Burn")], programId);
+  const accountPubKey = await PublicKey.findProgramAddress([Buffer.from("Platform"), Buffer.from("State")], programId);
   const systemPubKey = SystemProgram.programId;
   const instruction = new TransactionInstruction({
     keys: [
       {pubkey: payerAccount.publicKey, isSigner: true, isWritable: false},
       {pubkey: accountPubKey[0], isSigner: false, isWritable: true},
-      {pubkey: vaultPubKey[0], isSigner: false, isWritable: true},
-      {pubkey: mintlogPubKey[0], isSigner: false, isWritable: true},
-      {pubkey: burnlogPubKey[0], isSigner: false, isWritable: true},
       {pubkey: programId, isSigner: false, isWritable: false},
       {pubkey: systemPubKey, isSigner: false, isWritable: false},
       {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false}
@@ -179,28 +176,19 @@ export async function initializeProgram(): Promise<void> {
   );
 }
 
-export async function mintToken(): Promise<void> {
-  const bs58 = require('bs58');
-
-  const byteArray = [3];
-  const amount = longToByteArray(10000);
-  const list = [Buffer.from(byteArray), Buffer.from(amount)];
+export async function changeAuthority(): Promise<void> {
+  const byteArray = [1];
+  const instrunctionBuffer = Buffer.from(byteArray);
+  const authorityBuffer = Buffer.from(payerAccount.publicKey.toBytes());
+  const list = [instrunctionBuffer, authorityBuffer];
   const buffer = Buffer.concat(list);
 
-  const accountPubKey = await PublicKey.findProgramAddress([Buffer.from("Locker"), Buffer.from("Init")], programId);
-  const tokenAccountPubKey = new PublicKey('2Fjsu78vgi9FsEMjrTTpfHNRvK1Z9hx4Q6D1dQdog5mS');
-  const tokenMintPubKey = new PublicKey('CpM3TgsV6WeJLaaLSpk4AdsZD9AUMdvFZiFUNF5hrzp5');
-  console.log('token-mint', tokenMintPubKey.toString());
-  console.log('token-account', tokenAccountPubKey);
-  console.log('state-account', accountPubKey.toString());
-
+  const accountPubKey = await PublicKey.findProgramAddress([Buffer.from("Platform"), Buffer.from("State")], programId);
+  const systemPubKey = SystemProgram.programId;
   const instruction = new TransactionInstruction({
     keys: [
       {pubkey: payerAccount.publicKey, isSigner: true, isWritable: false},
-      {pubkey: accountPubKey[0], isSigner: false, isWritable: true},
-      {pubkey: tokenAccountPubKey, isSigner: false, isWritable: true},
-      {pubkey: tokenMintPubKey, isSigner: false, isWritable: true},
-      {pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false}
+      {pubkey: accountPubKey[0], isSigner: false, isWritable: true}
     ],
     programId,
     data: buffer,
@@ -213,29 +201,88 @@ export async function mintToken(): Promise<void> {
   );
 }
 
-export async function burnToken(): Promise<void> {
-  const byteArray = [4];
-  const amount = longToByteArray(10000);
-  const ethAddress = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
-  const list = [Buffer.from(byteArray), Buffer.from(amount), Buffer.from(ethAddress)];
+export async function list(): Promise<void> {
+
+  const byteArray = [3];
+  const amount = longToByteArray(1000000000);
+  const list = [Buffer.from(byteArray), Buffer.from(amount)];
   const buffer = Buffer.concat(list);
 
-  const ownerAccount = await readAccountFromFile(path.join(path.resolve(__dirname, '../../dist/token-account'), 'token-account-keypair.json'));
-  const accountPubKey = await PublicKey.findProgramAddress([Buffer.from("Locker"), Buffer.from("Init")], programId);
-  const burnlogPubKey = await PublicKey.findProgramAddress([Buffer.from("Locker"), Buffer.from("Burn")], programId);
-  const tokenAccountPubKey = new PublicKey('2Fjsu78vgi9FsEMjrTTpfHNRvK1Z9hx4Q6D1dQdog5mS');
-  const tokenMintPubKey = new PublicKey('CpM3TgsV6WeJLaaLSpk4AdsZD9AUMdvFZiFUNF5hrzp5');
-  console.log('token-mint', tokenMintPubKey.toString());
-  console.log('token-account', tokenAccountPubKey);
-  console.log('state-account', accountPubKey.toString());
+  const keyPairPath = path.resolve(__dirname, '../../dist/lister/lister-keypair.json')
+  const listerAccount = await readAccountFromFile(keyPairPath)
+  const listerPubKey = listerAccount.publicKey
+
+  const tokenMintPubKey = new PublicKey('Fn386evLgVty7pBneoYF1shVWGZE8eqrA6fw9j8xLfDU');
+  const tokenAccountPubKey = await findAssociatedTokenAddress(listerPubKey, tokenMintPubKey);
+  const escrowStatePubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    listerPubKey.toBuffer(),
+    Buffer.from("List"),
+    Buffer.from("State")
+  ], programId))[0];
+  const escrowVaultPubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    listerPubKey.toBuffer(),
+    Buffer.from("List"),
+    Buffer.from("Vault")
+  ], programId))[0];
 
   const instruction = new TransactionInstruction({
     keys: [
-      {pubkey: ownerAccount.publicKey, isSigner: true, isWritable: false},
-      {pubkey: accountPubKey[0], isSigner: false, isWritable: true},
-      {pubkey: burnlogPubKey[0], isSigner: false, isWritable: true},
+      {pubkey: listerPubKey, isSigner: true, isWritable: false},
       {pubkey: tokenAccountPubKey, isSigner: false, isWritable: true},
       {pubkey: tokenMintPubKey, isSigner: false, isWritable: true},
+      {pubkey: escrowStatePubkey, isSigner: false, isWritable: true},
+      {pubkey: escrowVaultPubkey, isSigner: false, isWritable: true},
+      {pubkey: programId, isSigner: false, isWritable: false},
+      {pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false},
+      {pubkey: SystemProgram.programId, isSigner: false, isWritable: false},
+      {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false}
+    ],
+    programId,
+    data: buffer,
+  });
+  console.log('Sending transaction for update')
+  await sendAndConfirmTransaction(
+    connection,
+    new Transaction().add(instruction),
+    [listerAccount],
+  );
+}
+
+export async function deList(): Promise<void> {
+
+  const byteArray = [4];
+  const list = [Buffer.from(byteArray)];
+  const buffer = Buffer.concat(list);
+
+  const keyPairPath = path.resolve(__dirname, '../../dist/lister/lister-keypair.json')
+  const listerAccount = await readAccountFromFile(keyPairPath)
+  const listerPubKey = listerAccount.publicKey
+
+  const tokenMintPubKey = new PublicKey('Fn386evLgVty7pBneoYF1shVWGZE8eqrA6fw9j8xLfDU');
+  const tokenAccountPubKey = await findAssociatedTokenAddress(listerPubKey, tokenMintPubKey);
+  const escrowStatePubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    listerPubKey.toBuffer(),
+    Buffer.from("List"),
+    Buffer.from("State")
+  ], programId))[0];
+  const escrowVaultPubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    listerPubKey.toBuffer(),
+    Buffer.from("List"),
+    Buffer.from("Vault")
+  ], programId))[0];
+
+  const instruction = new TransactionInstruction({
+    keys: [
+      {pubkey: listerPubKey, isSigner: true, isWritable: false},
+      {pubkey: tokenAccountPubKey, isSigner: false, isWritable: true},
+      {pubkey: tokenMintPubKey, isSigner: false, isWritable: true},
+      {pubkey: escrowStatePubkey, isSigner: false, isWritable: true},
+      {pubkey: escrowVaultPubkey, isSigner: false, isWritable: true},
+      {pubkey: programId, isSigner: false, isWritable: false},
       {pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false}
     ],
     programId,
@@ -245,30 +292,45 @@ export async function burnToken(): Promise<void> {
   await sendAndConfirmTransaction(
     connection,
     new Transaction().add(instruction),
-    [ownerAccount],
+    [listerAccount],
   );
 }
 
-export async function lockToken(): Promise<void> {
-  const byteArray = [1];
+export async function bid(): Promise<void> {
+
+  const byteArray = [5];
   const amount = longToByteArray(1000000000);
-  const ethAddress = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
-  const list = [Buffer.from(byteArray), Buffer.from(amount), Buffer.from(ethAddress)];
+  const list = [Buffer.from(byteArray), Buffer.from(amount)];
   const buffer = Buffer.concat(list);
 
-  const ownerAccount = await readAccountFromFile(path.join(path.resolve(__dirname, '../../dist/token-account'), 'token-account-keypair.json'));
-  const accountPubKey = await PublicKey.findProgramAddress([Buffer.from("Locker"), Buffer.from("Init")], programId);
-  const vaultPubKey = await PublicKey.findProgramAddress([Buffer.from("Locker"), Buffer.from("Vault")], programId);
-  const mintlogPubKey = await PublicKey.findProgramAddress([Buffer.from("Locker"), Buffer.from("Mint")], programId);
-  const systemPubKey = SystemProgram.programId;
+  const keyPairPath = path.resolve(__dirname, '../../dist/bidder/bidder-keypair.json')
+  const bidderAccount = await readAccountFromFile(keyPairPath)
+  const bidderPubKey = bidderAccount.publicKey
+
+  const tokenMintPubKey = new PublicKey('Fn386evLgVty7pBneoYF1shVWGZE8eqrA6fw9j8xLfDU');
+  const tokenAccountPubKey = await findAssociatedTokenAddress(bidderPubKey, tokenMintPubKey);
+  const escrowStatePubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    bidderPubKey.toBuffer(),
+    Buffer.from("Bid"),
+    Buffer.from("State")
+  ], programId))[0];
+  const escrowVaultPubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    bidderPubKey.toBuffer(),
+    Buffer.from("Bid"),
+    Buffer.from("Vault")
+  ], programId))[0];
 
   const instruction = new TransactionInstruction({
     keys: [
-      {pubkey: ownerAccount.publicKey, isSigner: true, isWritable: false},
-      {pubkey: accountPubKey[0], isSigner: false, isWritable: true},
-      {pubkey: vaultPubKey[0], isSigner: false, isWritable: true},
-      {pubkey: mintlogPubKey[0], isSigner: false, isWritable: true},
-      {pubkey: systemPubKey, isSigner: false, isWritable: false},
+      {pubkey: bidderPubKey, isSigner: true, isWritable: false},
+      {pubkey: tokenMintPubKey, isSigner: false, isWritable: true},
+      {pubkey: escrowStatePubkey, isSigner: false, isWritable: true},
+      {pubkey: escrowVaultPubkey, isSigner: false, isWritable: true},
+      {pubkey: programId, isSigner: false, isWritable: false},
+      {pubkey: SystemProgram.programId, isSigner: false, isWritable: false},
+      {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false}
     ],
     programId,
     data: buffer,
@@ -277,28 +339,202 @@ export async function lockToken(): Promise<void> {
   await sendAndConfirmTransaction(
     connection,
     new Transaction().add(instruction),
-    [ownerAccount],
+    [bidderAccount],
   );
 }
 
-export async function releaseToken(): Promise<void> {
-  const byteArray = [2];
-  const amount = longToByteArray(1000000000);
-  const list = [Buffer.from(byteArray), Buffer.from(amount)];
+export async function withdrawBid(): Promise<void> {
+
+  const byteArray = [6];
+  const list = [Buffer.from(byteArray)];
   const buffer = Buffer.concat(list);
 
-  const destinationAccount = await readAccountFromFile(path.join(path.resolve(__dirname, '../../dist/token-account'), 'token-account-keypair.json'));
-  const accountPubKey = await PublicKey.findProgramAddress([Buffer.from("Locker"), Buffer.from("Init")], programId);
-  const vaultPubKey = await PublicKey.findProgramAddress([Buffer.from("Locker"), Buffer.from("Vault")], programId);
-  const systemPubKey = SystemProgram.programId;
+  const keyPairPath = path.resolve(__dirname, '../../dist/bidder/bidder-keypair.json')
+  const bidderAccount = await readAccountFromFile(keyPairPath)
+  const bidderPubKey = bidderAccount.publicKey
+
+  const tokenMintPubKey = new PublicKey('Fn386evLgVty7pBneoYF1shVWGZE8eqrA6fw9j8xLfDU');
+  const escrowStatePubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    bidderPubKey.toBuffer(),
+    Buffer.from("Bid"),
+    Buffer.from("State")
+  ], programId))[0];
+  const escrowVaultPubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    bidderPubKey.toBuffer(),
+    Buffer.from("Bid"),
+    Buffer.from("Vault")
+  ], programId))[0];
+
+  const instruction = new TransactionInstruction({
+    keys: [
+      {pubkey: bidderPubKey, isSigner: true, isWritable: false},
+      {pubkey: tokenMintPubKey, isSigner: false, isWritable: true},
+      {pubkey: escrowStatePubkey, isSigner: false, isWritable: true},
+      {pubkey: escrowVaultPubkey, isSigner: false, isWritable: true},
+      {pubkey: programId, isSigner: false, isWritable: false}
+    ],
+    programId,
+    data: buffer,
+  });
+  console.log('Sending transaction for update')
+  await sendAndConfirmTransaction(
+    connection,
+    new Transaction().add(instruction),
+    [bidderAccount],
+  );
+}
+
+export async function acceptBid(): Promise<void> {
+
+  const byteArray = [7];
+  const list = [Buffer.from(byteArray)];
+  const buffer = Buffer.concat(list);
+
+  const listerKeyPairPath = path.resolve(__dirname, '../../dist/lister/lister-keypair.json')
+  const listerAccount = await readAccountFromFile(listerKeyPairPath)
+  const listerPubKey = listerAccount.publicKey
+
+  const bidderKeyPairPath = path.resolve(__dirname, '../../dist/bidder/bidder-keypair.json')
+  const bidderAccount = await readAccountFromFile(bidderKeyPairPath)
+  const bidderPubKey = bidderAccount.publicKey
+
+  const tokenMintPubKey = new PublicKey('Fn386evLgVty7pBneoYF1shVWGZE8eqrA6fw9j8xLfDU');
+  const listEscrowStatePubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    listerPubKey.toBuffer(),
+    Buffer.from("List"),
+    Buffer.from("State")
+  ], programId))[0];
+  const listEscrowVaultPubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    listerPubKey.toBuffer(),
+    Buffer.from("List"),
+    Buffer.from("Vault")
+  ], programId))[0];
+  const bidEscrowStatePubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    bidderPubKey.toBuffer(),
+    Buffer.from("Bid"),
+    Buffer.from("State")
+  ], programId))[0];
+  const bidEscrowVaultPubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    bidderPubKey.toBuffer(),
+    Buffer.from("Bid"),
+    Buffer.from("Vault")
+  ], programId))[0];
+
+  const instruction = new TransactionInstruction({
+    keys: [
+      {pubkey: listerPubKey, isSigner: true, isWritable: false},
+      {pubkey: tokenMintPubKey, isSigner: false, isWritable: true},
+      {pubkey: bidderPubKey, isSigner: false, isWritable: true},
+      {pubkey: bidEscrowStatePubkey, isSigner: false, isWritable: true},
+      {pubkey: bidEscrowVaultPubkey, isSigner: false, isWritable: true},
+      {pubkey: listEscrowStatePubkey, isSigner: false, isWritable: true},
+      {pubkey: listEscrowVaultPubkey, isSigner: false, isWritable: true}
+    ],
+    programId,
+    data: buffer,
+  });
+  console.log('Sending transaction for update')
+  await sendAndConfirmTransaction(
+    connection,
+    new Transaction().add(instruction),
+    [listerAccount],
+  );
+}
+
+export async function withdrawOnSuccess(): Promise<void> {
+
+  const byteArray = [8];
+  const list = [Buffer.from(byteArray)];
+  const buffer = Buffer.concat(list);
+
+  const bidderKeyPairPath = path.resolve(__dirname, '../../dist/bidder/bidder-keypair.json')
+  const bidderAccount = await readAccountFromFile(bidderKeyPairPath)
+  const bidderPubKey = bidderAccount.publicKey
+
+  const listerKeyPairPath = path.resolve(__dirname, '../../dist/lister/lister-keypair.json')
+  const listerAccount = await readAccountFromFile(listerKeyPairPath)
+  const listerPubKey = listerAccount.publicKey
+
+  const tokenMintPubKey = new PublicKey('Fn386evLgVty7pBneoYF1shVWGZE8eqrA6fw9j8xLfDU');
+  const tokenAccountPubKey = await findAssociatedTokenAddress(bidderPubKey, tokenMintPubKey);
+  const listEscrowStatePubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    listerPubKey.toBuffer(),
+    Buffer.from("List"),
+    Buffer.from("State")
+  ], programId))[0];
+  const listEscrowVaultPubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    listerPubKey.toBuffer(),
+    Buffer.from("List"),
+    Buffer.from("Vault")
+  ], programId))[0];
+
+  const instruction = new TransactionInstruction({
+    keys: [
+      {pubkey: bidderPubKey, isSigner: true, isWritable: false},
+      {pubkey: tokenAccountPubKey, isSigner: false, isWritable: true},
+      {pubkey: tokenMintPubKey, isSigner: false, isWritable: true},
+      {pubkey: listerPubKey, isSigner: false, isWritable: true},
+      {pubkey: listEscrowStatePubkey, isSigner: false, isWritable: true},
+      {pubkey: listEscrowVaultPubkey, isSigner: false, isWritable: true},
+      {pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false}
+    ],
+    programId,
+    data: buffer,
+  });
+  console.log('Sending transaction for update')
+  await sendAndConfirmTransaction(
+    connection,
+    new Transaction().add(instruction),
+    [bidderAccount],
+  );
+}
+
+export async function refund(): Promise<void> {
+
+  const byteArray = [9];
+  const list = [Buffer.from(byteArray)];
+  const buffer = Buffer.concat(list);
+
+  const tokenMintPubKey = new PublicKey('Fn386evLgVty7pBneoYF1shVWGZE8eqrA6fw9j8xLfDU');
+
+  const keyPairPath = path.resolve(__dirname, '../../dist/bidder/bidder-keypair.json')
+  const bidderAccount = await readAccountFromFile(keyPairPath)
+  const bidderPubKey = bidderAccount.publicKey
+
+  const programStatePubkey = (await PublicKey.findProgramAddress([
+    Buffer.from("Platform"),
+    Buffer.from("State")
+  ], programId))[0];
+
+  const escrowStatePubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    bidderPubKey.toBuffer(),
+    Buffer.from("Bid"),
+    Buffer.from("State")
+  ], programId))[0];
+  const escrowVaultPubkey = (await PublicKey.findProgramAddress([
+    tokenMintPubKey.toBuffer(), 
+    bidderPubKey.toBuffer(),
+    Buffer.from("Bid"),
+    Buffer.from("Vault")
+  ], programId))[0];
 
   const instruction = new TransactionInstruction({
     keys: [
       {pubkey: payerAccount.publicKey, isSigner: true, isWritable: false},
-      {pubkey: accountPubKey[0], isSigner: false, isWritable: true},
-      {pubkey: vaultPubKey[0], isSigner: false, isWritable: true},
-      {pubkey: destinationAccount.publicKey, isSigner: false, isWritable: true},
-      {pubkey: systemPubKey, isSigner: false, isWritable: false},
+      {pubkey: tokenMintPubKey, isSigner: false, isWritable: true},
+      {pubkey: bidderPubKey, isSigner: false, isWritable: true},
+      {pubkey: programStatePubkey, isSigner: false, isWritable: false},
+      {pubkey: escrowStatePubkey, isSigner: false, isWritable: true},
+      {pubkey: escrowVaultPubkey, isSigner: false, isWritable: true}
     ],
     programId,
     data: buffer,

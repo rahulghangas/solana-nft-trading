@@ -6,7 +6,9 @@ import os from 'os';
 import fs from 'mz/fs';
 import path from 'path';
 import yaml from 'yaml';
-import {Account, Connection} from '@solana/web3.js';
+import {Account, Connection, PublicKey} from '@solana/web3.js';
+
+import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
 // zzz
 export function sleep(ms: number): Promise<void> {
@@ -94,5 +96,23 @@ export function longToByteArray (num: number): number[] {
       num = (num - byte) / 256 ;
   }
 
-  return byteArray;
+  return byteArray.reverse();
 };
+
+export async function findAssociatedTokenAddress(
+  walletAddress: PublicKey,
+  tokenMintAddress: PublicKey
+): Promise<PublicKey> {
+  const assocAccounts = (await PublicKey.findProgramAddress(
+      [
+          walletAddress.toBuffer(),
+          TOKEN_PROGRAM_ID.toBuffer(),
+          tokenMintAddress.toBuffer(),
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+  ));
+  if (!assocAccounts.length) {
+      return Promise.reject("No associated token accounts found for supplied address");
+  }
+  return assocAccounts[0]
+}
