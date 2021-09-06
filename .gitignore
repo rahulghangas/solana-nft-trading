@@ -4,4 +4,4 @@
 .env
 src/client/util/store
 test-ledger/
-dist
+*.so
