@@ -11,8 +11,8 @@ Mock bidder and lister keypairs are already present, but you need to
 
 This can be done as follows
   #### Fund users
-  * `solana airdrop $ROOT_PATH$/dist/bidder/bidder-keypair.json`
-  * `solana airdrop $ROOT_PATH$/dist/lister/lister-keypair.json`
+  * `solana airdrop 10 $ROOT_PATH$/dist/bidder/bidder-keypair.json`
+  * `solana airdrop 10 $ROOT_PATH$/dist/lister/lister-keypair.json`
   
   #### Create a token
   * `spl-token create-token --decimals 0` (assume created token address is `$TOKEN_MINT$` from hereon)
