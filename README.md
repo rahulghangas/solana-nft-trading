@@ -10,48 +10,68 @@ Mock bidder and lister keypairs are already present, but you need to
   3. Create token accounts for both users and send tokens accordingly
 
 This can be done as follows
-  #### Fund users
-  * `solana airdrop 10 $ROOT_PATH$/dist/bidder/bidder-keypair.json`
-  * `solana airdrop 10 $ROOT_PATH$/dist/lister/lister-keypair.json`
-  
+  #### Init
+  ```shell
+    git clone git@github.com:Coinmeca/nft-trading-platform.git
+    cd nft-trading-platform.git
+    REPO_PATH=.
+    solana config set -u devnet -k ~/.config/solana/id.json
+  ```
+
+  #### Fund fee payer and users
+  ```shell
+    solana airdrop 1
+    solana airdrop 10 $REPO_PATH/dist/bidder/bidder-keypair.json
+    solana airdrop 10 $REPO_PATH/dist/lister/lister-keypair.json
+  ```
+
+
   #### Create a token
-  * `spl-token create-token --decimals 0` (assume created token address is `$TOKEN_MINT$` from hereon)
-  
-  #### Create and mint to user account(s)
-  * `spl-token create-account $TOKEN_MINT$  --owner ~/repos/solana-nft-trading/dist/bidder/bidder-keypair.json`
-  * `spl-token create-account $TOKEN_MINT$  --owner ~/repos/solana-nft-trading/dist/lister/lister-keypair.json` (assume created token account address is `$LISTER_TOKEN_ADDRESS$` from hereon)
-  * `spl-token mint $TOKEN_MINT$ 1 $LISTER_TOKEN_ADDRESS$`
-  
+  ```shell
+    export TOKEN_MINT=$(spl-token create-token --decimals 0 | grep "Creating token" | cut -d" " -f3)
+    export BIDDER_TOKEN_ADDRESS=$(spl-token create-account $TOKEN_MINT  --owner $REPO_PATH/dist/bidder/bidder-keypair.json | grep "Creating account" | cut -d" " -f3)
+    export LISTER_TOKEN_ADDRESS=$(spl-token create-account $TOKEN_MINT  --owner $REPO_PATH/dist/lister/lister-keypair.json | grep "Creating account" | cut -d" " -f3)
+    spl-token mint $TOKEN_MINT 1 $LISTER_TOKEN_ADDRESS
+  ```
+
   #### Disable furthur mints (optional)
-  * `spl-token authorize $TOKEN_MINT$ mint --disable`
+  ```shell
+  spl-token authorize $TOKEN_MINT mint --disable
+  ```
 
   #### Build, deploy and initialize program
-  * `npm run build:program-rust`
-  * `solana program deploy $ROOT_PATH$/dist/program/test.so`
-  * `npm run init`
+  ```shell
+  npm run build:program-rust
+  ```
+  ```shell
+  solana program deploy $REPO_PATH/dist/program/test.so
+  ```
+  ```shell
+  npm run init
+  ```
 
   #### Edit client mint pubkey
-  Go to `$ROOT_PATH/src/client/test.ts` and replace the top level `tokenMintPubKey` with your new token `$TOKEN_MINT`
-  
+  Go to `$REPO_PATH/src/client/test.ts` and replace the top level `tokenMintPubKey` with your new token `$TOKEN_MINT`
+
 ## Trading
   #### Listing
     You can list the token created above by run `npm run list`
-  
+
   #### Delisting
     You can delist the token created above by run `npm run delist`
-  
+
   #### Bidding
     You can bid for the token created above by run `npm run bid`
-  
+
   #### Withdraw Bid
     You can withdraw bid for the token created above by run `npm run withdraw-bid`
-  
+
   #### Trading
     A trade can happen two ways (a lister accepts a bid, or a bidder accepts a listing)
     * Lister can accept bid usign `npm run accept-bid`
-  
+
       --Note: Both a listing a bid should be present in order to call `AcceptBid`. `AcceptBid` is a non-inavsive instruction, that is, it doesn't assume that the bidder has a token accoutn yet. After a successful trade, the bidder can create a token account and call the `WithdrawOnSuccess` instruction. We have already set up the bidder account, so you can simply call call `npm run withdraw-on-success`
-    
+
     * Bidder can accept lisitng using `npm run accept-listing`
 
       A bid doesn't nend to be placed to accept a listing as is. That is, a listing can be accepted at the designated listing price without setting up a bidding escrow
