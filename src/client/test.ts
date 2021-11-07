@@ -25,7 +25,7 @@ import {
   findAssociatedTokenAddress
 } from './utils';
 
-const tokenMintPubKey = new PublicKey('9w2RGKJE8pCDGCLztsiL6bvnVcV9bU5Re2sfE65mBuLr');
+const tokenMintPubKey = new PublicKey('A2drjwVLywomUqEHcGo1piez3GWw5cfZN3d5LuD3aFFN');
 
 /**
  * Connection to the network
@@ -391,7 +391,6 @@ export async function acceptBid(): Promise<void> {
   const bidderAccount = await readAccountFromFile(bidderKeyPairPath);
   const bidderPubKey = bidderAccount.publicKey;
 
-  const tokenMintPubKey = new PublicKey('9w2RGKJE8pCDGCLztsiL6bvnVcV9bU5Re2sfE65mBuLr');
   const listEscrowStatePubkey = (await PublicKey.findProgramAddress([
     tokenMintPubKey.toBuffer(), 
     listerPubKey.toBuffer(),
