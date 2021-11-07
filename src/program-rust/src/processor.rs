@@ -803,7 +803,7 @@ impl Processor {
             &mut escrow_list_state_account_info.data.borrow_mut()
         )?;
 
-        let fees_to_platform = (bid_state.amount * platform_state.platform_fee ) / 10000000;
+        let fees_to_platform = (bid_state.amount * platform_state.platform_fee ) / 1000000000;
         let amount_after_fees = bid_state.amount - fees_to_platform;
         let lamports_to_bidder = escrow_bid_state_account_info.lamports() + escrow_bid_vault_account_info.lamports() - bid_state.amount;
         **escrow_bid_state_account_info.try_borrow_mut_lamports()? = 0;
@@ -1087,7 +1087,7 @@ impl Processor {
             return Err(NFTError::ListingAlreadyFullfilled.into());
         }
 
-        let fees_to_platform = (list_state.amount * platform_state.platform_fee ) / 10000000;
+        let fees_to_platform = (list_state.amount * platform_state.platform_fee ) / 1000000000;
         let amount_after_fees = list_state.amount - fees_to_platform;
 
         let transfer_lamports_lister_ix = system_instruction::transfer(signer_info.key, lister_account_info.key, amount_after_fees);
