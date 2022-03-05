@@ -55,26 +55,26 @@ This can be done as follows
 
 ## Trading
   #### Listing
-    You can list the token created above by run `npm run list`
+    You can list the token created above by running `npm run list`
 
   #### Delisting
-    You can delist the token created above by run `npm run delist`
+    You can delist the token created above by running `npm run delist`
 
   #### Bidding
-    You can bid for the token created above by run `npm run bid`
+    You can bid for the token created above by running `npm run bid`
 
   #### Withdraw Bid
-    You can withdraw bid for the token created above by run `npm run withdraw-bid`
+    You can withdraw bid for the token created above by running `npm run withdraw-bid`
 
   #### Trading
     A trade can happen two ways (a lister accepts a bid, or a bidder accepts a listing)
-    * Lister can accept bid usign `npm run accept-bid`
+    * Lister can accept a bid using `npm run accept-bid`
 
-      --Note: Both a listing a bid should be present in order to call `AcceptBid`. `AcceptBid` is a non-inavsive instruction, that is, it doesn't assume that the bidder has a token accoutn yet. After a successful trade, the bidder can create a token account and call the `WithdrawOnSuccess` instruction. We have already set up the bidder account, so you can simply call call `npm run withdraw-on-success`
+      --Note: Both a listing and a bid should be present in order to call `AcceptBid`. `AcceptBid` is a non-inavsive instruction, that is, it doesn't assume that the bidder has a token account yet. After a successful trade, the bidder can create a token account and call the `WithdrawOnSuccess` instruction. We have already set up the bidder account, so you can simply call call `npm run withdraw-on-success`
 
     * Bidder can accept lisitng using `npm run accept-listing`
 
-      A bid doesn't nend to be placed to accept a listing as is. That is, a listing can be accepted at the designated listing price without setting up a bidding escrow
+      A bid doesn't need to be placed to accept a listing as is. That is, a listing can be accepted at the designated listing price without setting up a bidding escrow
 
 ## Refund Users
 The program authority can close escrows and refund bidders at will by calling the `RefundUser` instruction. Run `npm run refund` to refund the test bidder
