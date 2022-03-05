@@ -4,7 +4,7 @@
   "description": "",
   "keywords": [],
   "author": "",
-  "license": "MIT",
+  "license": "GPLv3",
   "scripts": {
     "init": "ts-node src/client/init.ts",
     "change-authority": "ts-node src/client/change-authority.ts",
